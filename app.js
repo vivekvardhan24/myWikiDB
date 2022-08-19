@@ -1,11 +1,20 @@
-//jshint esversion:6
-
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
+const { mongo } = require("mongoose");
+const { ObjectId } = require("bson");
 
 const app = express();
+
+mongoose.connect("mongodb://localhost:27017/wikiDB",{useNewUrlParser: true});
+
+const articleSchema = {
+  title: String,
+  content: String
+}
+
+const Article = mongoose.model("article", articleSchema);
 
 app.set('view engine', 'ejs');
 
@@ -14,120 +23,102 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(express.static("public"));
 
-mongoose.connect("mongodb://localhost:27017/wikiDB", {
-  useNewUrlParser: true
-});
-
-const articleSchema = {
-  title: String,
-  content: String
-};
-
-const Article = mongoose.model("Article", articleSchema);
-
-/////////////////////////All Articles///////////////////////////////////
+//TODO
 
 app.route("/articles")
 
+  .get(function(req, res){
+    Article.find({},function(err, foundArticles){
+      if(err){
+        console.log(err);
+      }
+      else{
+        res.send(foundArticles);
+      }
+    })
+  })
 
-.get(function(req, res){
-  Article.find(function(err, articles){
-    if (articles) {
-      const jsonArticles = JSON.stringify(articles);
-      res.send(jsonArticles);
-    } else {
-      res.send("No articles currently in wikiDB.");
-    }
-  });
-})
-
-.post(function(req, res){
-  const newArticle = Article({
-    title: req.body.title,
-    content: req.body.content
-  });
-
-  newArticle.save(function(err){
-    if (!err){
-      res.send("Successfully added a new article.");
-    } else {
-      res.send(err);
-    }
-  });
-})
-
-.delete(function(req, res){
-
-  Article.deleteMany(function(err){
-    if (!err){
-      res.send("Successfully deleted all the articles in wikiDB.");
-    } else {
-      res.send(err);
-    }
-  });
-
-});
-
-
-/////////////////////////Individual Articles///////////////////////////////////
-
-app.route("/articles/:articleTitle")
-
-.get(function(req, res){
-  const articleTitle = req.params.articleTitle;
-  Article.findOne({title: articleTitle}, function(err, article){
-    if (article){
-      const jsonArticle = JSON.stringify(article);
-      res.send(jsonArticle);
-    } else {
-      res.send("No article with that title found.");
-    }
-  });
-})
-
-.patch(function(req, res){
-  const articleTitle = req.params.articleTitle;
-  Article.update(
-    {title: articleTitle},
-    {content: req.body.newContent},
-    function(err){
-      if (!err){
-        res.send("Successfully updated selected article.");
-      } else {
+  .post(function(req,res){
+    const newArticle = new Article({
+      title: req.body.title,
+      content: req.body.content
+    })
+    newArticle.save(function(err){
+      if(err){
         res.send(err);
       }
-    });
-})
+      else{
+        res.send("new Article is inserted into DB");
+      }
+    })
+  })
 
-.put(function(req, res){
-
-  const articleTitle = req.params.articleTitle;
-
-  Article.update(
-    {title: articleTitle},
-    {content: req.body.newContent},
-    {overwrite: true},
-    function(err){
-      if (!err){
-        res.send("Successfully updated the content of the selected article.");
-      } else {
+  .delete(function(req, res){
+    Article.deleteMany(function(err){
+      if(err){
         res.send(err);
       }
-    });
-})
-
-
-.delete(function(req, res){
-  const articleTitle = req.params.articleTitle;
-  LostPet.findOneAndDelete({title: articleTitle}, function(err){
-    if (!err){
-      res.send("Successfully deleted selected article.");
-    } else {
-      res.send(err);
-    }
+      else{
+        res.send("Successfully deleted all records");
+      }
+    })
   });
-});
 
+
+app.route("/articles/:id")
+
+  .get(function(req,res){
+    Article.findOne({_id: req.params.id},function(err, foundArticles){
+      if(err){
+        console.log(err);
+      }
+      else if(foundArticles){
+        res.send(foundArticles);
+      }
+      else{
+        res.send("No article found with the id");
+      }
+    })
+  })
+
+  .put(function(req,res){
+    Article.findByIdAndUpdate(req.params.id,{
+      title: req.body.title,
+      content: req.body.content
+    },{overwrite: true},
+    function(err){
+      console.log(req.body);  
+      if(err){
+        res.send(err);
+      }
+      else{
+        res.send("Successfully updated the record")
+      }
+    })
+  })
+  
+  .delete(function(req,res){
+    Article.findByIdAndDelete(req.params.id, function(err){
+      if(err){
+        res.send(err);
+      }
+      else{
+        res.send("Successfully deleted the record")
+      }
+    })
+  })
+  
+  .patch(function(req,res){
+    Article.findByIdAndUpdate(req.params.id,
+      {$set: req.body},function(err){
+        if(err){
+          res.send(err);
+        }
+        else{
+          res.send("Successfully Patched article");
+        }
+      })
+  });
 
 app.listen(3000, function() {
   console.log("Server started on port 3000");
